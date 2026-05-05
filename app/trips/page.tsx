@@ -24,7 +24,7 @@ export default function TripsPage() {
       .select("id, share_slug, city, days, budget, created_at")
       .order("created_at", { ascending: false })
       .limit(20)
-      .then(({ data }) => {
+      .then(({ data }: { data: any }) => {
         setTrips(data ?? []);
         setLoading(false);
       });

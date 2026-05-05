@@ -16,7 +16,13 @@ type Props = {
 
 function normalizeMode(mode: string): "metro" | "bus" | "train" | "walk" {
   const m = mode.toLowerCase();
-  if (m.includes("metro") || m.includes("tube") || m.includes("underground") || m.includes("subway") || m.includes("mrt"))
+  if (
+    m.includes("metro") ||
+    m.includes("tube") ||
+    m.includes("underground") ||
+    m.includes("subway") ||
+    m.includes("mrt")
+  )
     return "metro";
   if (m.includes("bus") || m.includes("tram")) return "bus";
   if (m.includes("train") || m.includes("rail")) return "train";
@@ -26,10 +32,14 @@ function normalizeMode(mode: string): "metro" | "bus" | "train" | "walk" {
 function getPolylineStyle(mode: string) {
   const nm = normalizeMode(mode);
   switch (nm) {
-    case "metro": return { color: "#E040FB", weight: 6, opacity: 1, dashArray: undefined };
-    case "bus":   return { color: "#00B0FF", weight: 5, opacity: 1, dashArray: undefined };
-    case "train": return { color: "#FF6D00", weight: 6, opacity: 1, dashArray: undefined };
-    default:      return { color: "#056f3c", weight: 6, opacity: 1, dashArray: "6, 10" };
+    case "metro":
+      return { color: "#E040FB", weight: 6, opacity: 1, dashArray: undefined };
+    case "bus":
+      return { color: "#00B0FF", weight: 5, opacity: 1, dashArray: undefined };
+    case "train":
+      return { color: "#FF6D00", weight: 6, opacity: 1, dashArray: undefined };
+    default:
+      return { color: "#056f3c", weight: 5, opacity: 1, dashArray: "6, 10" };
   }
 }
 
@@ -48,7 +58,12 @@ export function JourneyGenie({ stops, activeIndex, onSelect, city }: Props) {
   // Init map once
   useEffect(() => {
     let cancelled = false;
-    if (typeof window === "undefined" || mapRef.current || !containerRef.current) return;
+    if (
+      typeof window === "undefined" ||
+      mapRef.current ||
+      !containerRef.current
+    )
+      return;
 
     import("leaflet").then((mod) => {
       if (cancelled || !containerRef.current || mapRef.current) return;
@@ -81,7 +96,7 @@ export function JourneyGenie({ stops, activeIndex, onSelect, city }: Props) {
           <div><span style="display:inline-block;width:24px;height:4px;background:#E040FB;margin-right:8px;vertical-align:middle;border-radius:2px"></span>Metro</div>
           <div><span style="display:inline-block;width:24px;height:4px;background:#00B0FF;margin-right:8px;vertical-align:middle;border-radius:2px"></span>Bus</div>
           <div><span style="display:inline-block;width:24px;height:4px;background:#FF6D00;margin-right:8px;vertical-align:middle;border-radius:2px"></span>Train</div>
-          <div style="display:flex;align-items:center"><span style="display:inline-block;width:24px;border-top:3px dashed #00E676;margin-right:8px"></span>Walk</div>
+          <div style="display:flex;align-items:center"><span style="display:inline-block;width:24px;border-top:3px dashed #056f3c;margin-right:8px"></span>Walk</div>
         </div>`;
 
       const Legend = L.Control.extend({
@@ -96,7 +111,9 @@ export function JourneyGenie({ stops, activeIndex, onSelect, city }: Props) {
       setReady(true);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -147,7 +164,10 @@ export function JourneyGenie({ stops, activeIndex, onSelect, city }: Props) {
     // Per-leg colored polylines
     if (points.length > 1) {
       for (let i = 1; i < stops.length; i++) {
-        const from: [number, number] = [usedPositions[i - 1][0], usedPositions[i - 1][1]];
+        const from: [number, number] = [
+          usedPositions[i - 1][0],
+          usedPositions[i - 1][1],
+        ];
         const to: [number, number] = [usedPositions[i][0], usedPositions[i][1]];
         const mode = stops[i].transport_from_previous?.mode ?? "walk";
         const style = getPolylineStyle(mode);
