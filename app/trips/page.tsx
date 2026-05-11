@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Map, Loader2, MapPin, Calendar, Trash2, Clock } from "lucide-react";
+import { Loader2, MapPin, Calendar, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getCurrency } from "@/lib/cities";
+import { toast } from "sonner";
 
 type Trip = {
   id: string;
@@ -40,11 +41,47 @@ export default function TripsPage() {
     fetchTrips();
   }, []);
 
+  // const deleteTrip = async (id: string) => {
+  //   if (!confirm("Delete this trip?")) return;
+  //   setDeleting(id);
+  //   await supabase.from("trips").delete().eq("id", id);
+
+  //   // Also clear from session storage if it's the current trip
+  //   try {
+  //     const raw = sessionStorage.getItem("journeygenie");
+  //     if (raw) {
+  //       const current = JSON.parse(raw);
+  //       // Find the trip being deleted to compare
+  //       const deletedTrip = trips.find((t) => t.id === id);
+  //       if (deletedTrip && current.meta?.city === deletedTrip.city) {
+  //         sessionStorage.removeItem("journeygenie:current");
+  //       }
+  //     }
+  //   } catch {
+  //     // silent fail
+  //   }
+
+  //   setTrips((prev) => prev.filter((t) => t.id !== id));
+  //   setDeleting(null);
+  //   toast.success("Trip deleted");
+  // };
+
   const deleteTrip = async (id: string) => {
     if (!confirm("Delete this trip?")) return;
+
     setDeleting(id);
-    await supabase.from("trips").delete().eq("id", id);
+
+    const { error } = await supabase.from("trips").delete().eq("id", id);
+
+    if (error) {
+      toast.error(error.message);
+      setDeleting(null);
+      return;
+    }
+
     setTrips((prev) => prev.filter((t) => t.id !== id));
+
+    toast.success("Trip deleted");
     setDeleting(null);
   };
 
@@ -69,9 +106,14 @@ export default function TripsPage() {
       <header className="bg-white border-b border-[#dadce0] sticky top-0 z-10">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2">
-            <Map className="h-5 w-5 text-[#1a73e8]" />
+            <svg height="22" viewBox="0 0 24 24" width="22">
+              <path
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+                fill="#1a73e8"
+              />
+            </svg>
             <span
-              className="font-medium text-[#202124]"
+              className="text-lg font-medium text-[#202124]"
               style={{ fontFamily: "'Google Sans', Roboto, sans-serif" }}
             >
               JourneyGenie
@@ -95,10 +137,34 @@ export default function TripsPage() {
         </h1>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-[#1a73e8]" />
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 rounded-2xl border border-[#dadce0] bg-white p-4 animate-pulse"
+              >
+                {/* Icon skeleton */}
+                <div className="w-12 h-12 rounded-xl bg-[#e8eaed] shrink-0" />
+
+                {/* Text skeleton */}
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 w-40 rounded bg-[#e8eaed]" />
+                  <div className="mt-3 flex gap-2">
+                    <div className="h-3 w-16 rounded bg-[#e8eaed]" />
+                    <div className="h-3 w-20 rounded bg-[#e8eaed]" />
+                    <div className="h-3 w-24 rounded bg-[#e8eaed]" />
+                  </div>
+                </div>
+
+                {/* Price/date skeleton */}
+                <div className="text-right shrink-0">
+                  <div className="h-4 w-16 rounded bg-[#e8eaed] ml-auto" />
+                  <div className="h-3 w-20 rounded bg-[#e8eaed] mt-2" />
+                </div>
+              </div>
+            ))}
           </div>
-        ) : trips.length === 0 ? (
+        ) : trips.length === 0 ?  (
           <div className="rounded-2xl border border-[#dadce0] bg-white p-12 text-center">
             <MapPin className="mx-auto mb-4 h-10 w-10 text-[#9aa0a6]" />
             <p className="text-[#5f6368] mb-4">No saved trips yet.</p>

@@ -8,6 +8,7 @@ import {
   Landmark,
   UtensilsCrossed,
   Activity,
+  Sailboat,
 } from "lucide-react";
 import type { Stop } from "@/lib/types";
 
@@ -25,6 +26,8 @@ function transportIcon(mode?: string) {
     m.includes("mrt")
   )
     return Train;
+  if (m.includes("ferry") || m.includes("boat") || m.includes("water"))
+    return Sailboat;
   return Bus;
 }
 
@@ -64,15 +67,35 @@ export function StopCard({
     <div>
       {showTransport && (
         <div className="transport-connector">
-          <TIcon className="h-3 w-3" />
-          {(t!.mode ?? "").toLowerCase().includes("walk") ? (
-            <span>{t!.walk_to_stop_mins ?? 10} min walk</span>
+          <TIcon className="h-3 w-3 shrink-0" />
+          {(t!.mode ?? "").toLowerCase() === "walk" ? (
+            <span className="text-[#5f6368]">
+              {t!.walk_to_stop_mins ?? 10} min walk
+            </span>
           ) : (
-            <span>
-              {cap(t!.mode)}
-              {t!.line ? ` ${t!.line}` : ""}
-              {t!.from_stop ? ` · ${t!.from_stop} → ${t!.to_stop}` : ""}
-              {fare > 0 ? ` · ${currencySymbol}${fare.toFixed(2)}` : ""}
+            <span className="text-[#5f6368] truncate">
+              {/* Mode label */}
+              <span className="font-medium">{cap(t!.mode)}</span>
+              {/* Line only if it's real and doesn't repeat the mode word */}
+              {t!.line &&
+                t!.line.toLowerCase() !== (t!.mode ?? "").toLowerCase() && (
+                  <span> {t!.line}</span>
+                )}
+              {/* Stops */}
+              {t!.from_stop && t!.to_stop && (
+                <span className="text-[#9aa0a6]">
+                  {" "}
+                  · {t!.from_stop} → {t!.to_stop}
+                </span>
+              )}
+              {/* Fare */}
+              {fare > 0 && (
+                <span className="text-[#9aa0a6]">
+                  {" "}
+                  · {currencySymbol}
+                  {Number(fare).toFixed(2)}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -107,7 +130,9 @@ export function StopCard({
           <div className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-muted-foreground">
             <TypeIcon className="h-3 w-3" />
             {stop.type} · {stop.duration_mins} min ·{" "}
-            {stop.entry_cost > 0 ? `£${stop.entry_cost.toFixed(2)}` : "Free"}
+            {stop.entry_cost > 0
+              ? `${currencySymbol}${stop.entry_cost.toFixed(2)}`
+              : "Free"}
           </div>
           {(stop.notes || stop.description) && (
             <div className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">

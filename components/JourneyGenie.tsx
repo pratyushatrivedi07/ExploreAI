@@ -44,7 +44,7 @@ function getPolylineStyle(mode: string) {
     case "train":
       return { color: "#FF6D00", weight: 6, opacity: 1, dashArray: undefined };
     case "ferry":
-      return { color: "#d40058", weight: 5, opacity: 1, dashArray: "8, 4" };
+      return { color: "#d40058", weight: 5, opacity: 1, dashArray: "6, 8" };
     default:
       return { color: "#056f3c", weight: 5, opacity: 1, dashArray: "6, 10" };
   }

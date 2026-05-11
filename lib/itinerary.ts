@@ -6,7 +6,7 @@ const CITY_TRANSIT: Record<
   { metroName: string; busName: string; metroFare: number; busFare: number }
 > = {
   london: { metroName: "Tube", busName: "Bus", metroFare: 2.8, busFare: 1.75 },
-  paris: { metroName: "Métro", busName: "Bus", metroFare: 1.8, busFare: 1.8 },
+  paris: { metroName: "Métro", busName: "Bus", metroFare: 2.1, busFare: 2.1 },
   barcelona: {
     metroName: "Metro",
     busName: "Bus",
@@ -20,21 +20,26 @@ const CITY_TRANSIT: Record<
     metroFare: 3.2,
     busFare: 3.2,
   },
-  tokyo: { metroName: "Metro", busName: "Bus", metroFare: 2.0, busFare: 1.5 },
+  tokyo: { metroName: "Metro", busName: "Bus", metroFare: 200, busFare: 230 },
   "new york": {
     metroName: "Subway",
     busName: "Bus",
     metroFare: 2.9,
     busFare: 2.9,
   },
-  dubai: { metroName: "Metro", busName: "Bus", metroFare: 2.0, busFare: 1.5 },
-  singapore: { metroName: "MRT", busName: "Bus", metroFare: 1.5, busFare: 1.2 },
-  sydney: { metroName: "Train", busName: "Bus", metroFare: 3.5, busFare: 2.5 },
+  dubai: { metroName: "Metro", busName: "Bus", metroFare: 7.5, busFare: 4.0 },
+  singapore: {
+    metroName: "MRT",
+    busName: "Bus",
+    metroFare: 1.68,
+    busFare: 1.68,
+  },
+  sydney: { metroName: "Train", busName: "Bus", metroFare: 3.8, busFare: 2.5 },
   delhi: {
     metroName: "Delhi Metro",
     busName: "DTC Bus",
-    metroFare: 0.35,
-    busFare: 0.2,
+    metroFare: 30,
+    busFare: 15,
   },
 };
 
@@ -60,6 +65,7 @@ export function enforceTransportModes(
       const currentMode = (t.mode ?? "walk").toLowerCase();
 
       if (currentMode === "start") return stop;
+      if (currentMode === "ferry") return stop;
 
       let correctedMode = currentMode;
       let correctedFare = t.fare ?? 0;
@@ -84,19 +90,28 @@ export function enforceTransportModes(
         correctedFare = 0;
       }
 
-      if (currentMode === "ferry") return stop;
-
       return {
         ...stop,
         transport_from_previous: {
           ...t,
           mode: correctedMode,
           fare: correctedFare,
+          // Only keep line if AI provided a real one — never use generic name as fallback
           line:
             correctedMode === "metro"
-              ? (t.line ?? transit.metroName)
+              ? t.line &&
+                t.line !== transit.metroName &&
+                t.line !== "Metro" &&
+                t.line !== "metro"
+                ? t.line
+                : null
               : correctedMode === "bus"
-                ? (t.line ?? transit.busName)
+                ? t.line &&
+                  t.line !== transit.busName &&
+                  t.line !== "Bus" &&
+                  t.line !== "bus"
+                  ? t.line
+                  : null
                 : null,
         },
       };
@@ -155,54 +170,109 @@ export function parseItineraryJson(content: string): any {
   }
 }
 
-export const SYSTEM_PROMPT = `You are a travel planning assistant. Return ONLY a valid JSON object — no markdown, no explanation, no code fences. Start your response with { and end with }.
+// export const SYSTEM_PROMPT = `You are a travel planning assistant. Return ONLY a valid JSON object. No markdown, no code fences, no explanation. Start with { and end with }.
 
-The JSON must match this exact structure:
-{
-  "city": "string",
-  "days": [
-    {
-      "day": 1,
-      "theme": "string (e.g. Historic London)",
-      "stops": [
-        {
-          "name": "string",
-          "type": "attraction | food | activity",
-          "lat": float,
-          "lng": float,
-          "duration_mins": int,
-          "entry_cost": float,
-          "notes": "string (1 sentence)",
-          "transport_from_previous": {
-            "mode": "walk | bus | metro | train | start",
-            "line": "string or null",
-            "from_stop": "string or null",
-            "to_stop": "string or null",
-            "fare": float,
-            "walk_to_stop_mins": int
-          }
-        }
-      ],
-      "daily_total_cost": float
-    }
-  ],
-  "trip_total_cost": float
-}
+// JSON structure:
+// {
+//   "city": "string",
+//   "days": [
+//     {
+//       "day": 1,
+//       "theme": "string",
+//       "stops": [
+//         {
+//           "name": "string",
+//           "type": "attraction | food | activity",
+//           "lat": float,
+//           "lng": float,
+//           "duration_mins": int,
+//           "entry_cost": float,
+//           "notes": "string (1 sentence max)",
+//           "transport_from_previous": {
+//             "mode": "walk | bus | metro | train | ferry | start",
+//             "line": "string or null",
+//             "from_stop": "string or null",
+//             "to_stop": "string or null",
+//             "fare": float,
+//             "walk_to_stop_mins": int
+//           }
+//         }
+//       ],
+//       "daily_total_cost": float
+//     }
+//   ],
+//   "trip_total_cost": float
+// }
 
-STRICT TRANSPORT RULES:
-1. Under 800m between stops: mode = "walk", fare = 0
-2. 800m–3km: use bus or metro. NEVER walk.
-3. Over 3km: use metro or train. NEVER walk or bus.
-4. Walking style: walk only under 1km, use transit beyond.
-5. Public style: always most direct transit, never walk over 800m.
-6. Mixed style: walk under 800m only, transit for everything else.
-7. Metro/tube: line = real line name (e.g. "Central Line"). from_stop and to_stop = real station names.
-8. Bus: line = real route number only, no word "Bus" (e.g. "15", "N29", "RV1" in London — "15" not "Bus 15"). from_stop = exact name of nearest bus stop to origin. to_stop = exact name of nearest bus stop to destination. Both are required — never null for bus mode.
-9. Metro: line = line name without word "Metro" (e.g. "Central Line" not "Metro Central Line"). from_stop and to_stop = exact station names. Both are required — never null for metro mode.
-10. Ferry/boat: if travel between stops requires a ferry, boat, or water taxi, use mode = "ferry". line = ferry route name. from_stop = departure pier name. to_stop = arrival pier name. This applies in Sydney (Manly Ferry), Amsterdam (GVB Ferry), Singapore (bumboats), etc. Never classify ferry as metro, bus, or train.
-11. fare = actual fare in LOCAL currency of the city (not GBP unless city is London). Tokyo fares in ¥, Paris in €, New York in $, etc.
-12. First stop each day: mode = "start", fare = 0, line/from_stop/to_stop = null.
-13. Order stops geographically — minimize backtracking. Route must never cross itself.`;
+// TRANSPORT RULES — non-negotiable:
+
+// WALK:
+// - Use ONLY when actual walking distance between stops is under 1km
+// - mode = "walk", line = null, from_stop = null, to_stop = null, fare = 0
+// - walk_to_stop_mins = realistic walking time in minutes
+
+// BUS:
+// - Use for distances between 1km and 4km where a real bus route exists
+// - line = REAL route number only (e.g. "15", "N29", "RV1") — no word "Bus" in the line field
+// - from_stop = exact real bus stop name nearest to origin
+// - to_stop = exact real bus stop name nearest to destination
+// - fare = actual local currency fare
+// - If you cannot identify a real bus route number and real stop names, DO NOT use bus — use metro instead
+// - NEVER invent a bus route number
+
+// METRO / TUBE / SUBWAY / MRT:
+// - Use for distances over 2km where metro exists, or when bus route is unknown
+// - line = real line name only (e.g. "Central Line", "Line 4", "Red Line") — no word "Metro" in line field
+// - from_stop = exact real station name
+// - to_stop = exact real station name
+// - fare = actual local currency fare
+// - If you cannot confirm a real metro line and stations, DO NOT include metro — rethink the route
+
+// TRAIN:
+// - Use for inter-district travel where overground/suburban train is the natural option
+// - Same rules as metro for line, from_stop, to_stop
+
+// FERRY:
+// - Use when water crossing is required (Sydney Harbour, Amsterdam canals, Singapore River)
+// - line = ferry service name (e.g. "F3 Manly Ferry")
+// - from_stop = departure wharf/pier name
+// - to_stop = arrival wharf/pier name
+// - NEVER classify ferry as metro, bus, or train
+
+// START:
+// - First stop of each day always uses mode = "start"
+// - fare = 0, line = null, from_stop = null, to_stop = null
+
+// CRITICAL RULES:
+// - If you don't know the exact bus route number: skip bus, use metro or walk
+// - If you don't know the exact metro line: skip metro, reroute via bus or walk
+// - Never use walk for distances over 1km
+// - Never show "Bus Bus" or "Metro Metro" — line field must not repeat the mode word
+// - All fares in LOCAL currency of the city
+// - Stops ordered geographically — route must never cross itself on a map
+// - 4–6 stops per day, exactly 1 food stop per day at meal time
+// - daily_total_cost = sum of all entry_cost + all fares for that day`;
+
+export const SYSTEM_PROMPT = `You are a travel planning assistant. Return ONLY valid JSON. No markdown, no code fences. Start with { end with }.
+
+JSON structure: city (string), days (array of: day int, theme string, stops array, daily_total_cost float), trip_total_cost float.
+Each stop: name, type (attraction|food|activity), lat, lng, duration_mins, entry_cost, notes (1 sentence), transport_from_previous (mode, line, from_stop, to_stop, fare, walk_to_stop_mins).
+
+TRANSPORT RULES:
+- Under 1km: walk only. fare=0, line=null, stops=null.
+- 1–4km: bus if real route confirmed, else metro.
+- Over 4km: metro or train.
+- Ferry: use for water crossings only.
+- First stop per day: mode="start", fare=0, line=null, stops=null.
+- Bus line = route number only (e.g. "15" not "Bus 15"). Must be real.
+- Metro line = line name only (e.g. "Central Line" not "Metro Central Line"). Must be real.
+- from_stop and to_stop = real stop/station names. Required for bus and metro.
+- If real route unknown: use walk (under 1km) or metro without line details.
+- All fares in local city currency.
+- Never walk over 1km. Never invent routes.
+- Order stops geographically — no route crossings.
+- 4–6 stops/day, exactly 1 food stop at meal time.
+- daily_total_cost = sum of entry_cost + fares.`;
 
 export function buildUserPrompt(
   city: string,
@@ -212,30 +282,31 @@ export function buildUserPrompt(
   mustVisit: string[],
 ): string {
   const budgetLabel: Record<string, string> = {
-    budget: "budget (under £50/day)",
-    mid: "mid-range ($50–£150/day)",
-    comfort: "comfort (£150+/day)",
+    budget: "low budget — prioritise free attractions and cheap eats",
+    mid: "mid-range — mix of paid attractions and mid-range restaurants",
+    comfort:
+      "comfort — premium experiences, good restaurants, avoid budget constraints",
   };
   const styleLabel: Record<string, string> = {
-    public: "public transport",
-    walking: "walking",
-    mixed: "mixed",
+    public:
+      "public transport only — always use the fastest available transit option",
+    walking:
+      "walking preferred — walk whenever under 1km, use transit only beyond 1km",
+    mixed:
+      "mixed — walk short distances under 1km, use transit for anything beyond",
   };
+  const currency = getCurrency(city);
 
-  return `Generate a realistic ${days}-day itinerary for ${city}.
+  return `Generate a ${days}-day itinerary for ${city}.
 Budget: ${budgetLabel[budget] ?? budget}
 Travel style: ${styleLabel[travelStyle] ?? travelStyle}
-Must-visit places: ${mustVisit.length ? mustVisit.join(", ") : "none"}
+Must-visit: ${mustVisit.length ? mustVisit.join(", ") : "none specified"}
+Currency: ALL monetary values (fares, entry costs) must be in ${currency.code} (${currency.symbol})
 
-Requirements:
-- Include exactly 1 food stop per day at a logical meal time
-- 4-6 stops per day total
-- Stops must be geographically clustered — minimize cross-city travel
-- All transport modes must follow the STRICT TRANSPORT RULES
-- Use accurate lat/lng coordinates for every stop in ${city}
-- daily_total_cost = sum of all entry_cost + all transport fares for that day
-- trip_total_cost = sum of all daily_total_cost values
-- Use ${getCurrency(city).code} (${getCurrency(city).symbol}) for all monetary values including fares and entry costs.
+Verify before including any transport:
+- For bus: confirm the route number exists in ${city} and the stop names are real
+- For metro: confirm the line name and station names are real in ${city}
+- If unsure about bus or metro details, use walk (if under 1km) or omit that transport leg
 
-CRITICAL GEOGRAPHIC RULE: Sort stops so each consecutive pair is the nearest unvisited stop. The route must never cross itself. Split far-apart must-visit places across different days.`;
+Geographic constraint: order stops to minimise total walking distance per day. No route should cross itself on a map. If must-visit places are spread across the city, split them across different days.`;
 }

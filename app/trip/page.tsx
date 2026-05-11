@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -61,6 +61,8 @@ export default function TripPage() {
     Array<{ display_name: string; lat: string; lon: string }>
   >([]);
   const [showMenu, setShowMenu] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(380);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("journeygenie:current");
@@ -71,18 +73,40 @@ export default function TripPage() {
     setData(JSON.parse(raw));
   }, [router]);
 
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      const newWidth = Math.min(
+        600,
+        Math.max(300, startWidth + ev.clientX - startX),
+      );
+      setSidebarWidth(newWidth);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   const day = useMemo(
     () =>
       data?.itinerary.days.find((d) => d.day === activeDay) ??
       data?.itinerary.days[0],
     [data, activeDay],
   );
+
   const tripTotal = useMemo(
     () =>
       data?.itinerary.days.reduce((s, d) => s + (d.daily_total_cost ?? 0), 0) ??
       0,
     [data],
   );
+
   const currency = useMemo(
     () => (data ? getCurrency(data.meta.city) : { symbol: "£", code: "GBP" }),
     [data],
@@ -220,11 +244,15 @@ export default function TripPage() {
 
   return (
     <div
-      className="flex h-screen flex-col md:flex-row"
+      className="flex h-screen flex-col md:flex-row overflow-hidden"
       style={{ fontFamily: "'Google Sans', Roboto, sans-serif" }}
     >
       {/* Sidebar */}
-      <aside className="flex w-full flex-col bg-white md:w-[380px] md:max-w-[380px] shadow-lg border-r border-[#dadce0]">
+      <aside
+        ref={sidebarRef}
+        className="flex w-full flex-col bg-white shadow-lg border-r border-[#dadce0] relative md:flex-shrink-0"
+        style={{ minWidth: 300, maxWidth: 600, width: sidebarWidth }}
+      >
         {/* Header */}
         <header className="flex items-center gap-2 px-3 py-3 border-b border-[#dadce0]">
           <Link
@@ -421,10 +449,17 @@ export default function TripPage() {
             </button>
           </div>
         </div>
+
+        <div
+          onMouseDown={startResize}
+          className="hidden md:flex absolute right-0 top-0 bottom-0 w-3 cursor-col-resize items-center justify-center group z-10"
+        >
+          <div className="w-0.5 h-10 bg-[#dadce0] group-hover:bg-[#1a73e8] group-hover:w-1 rounded-full transition-all" />
+        </div>
       </aside>
 
       {/* Map */}
-      <div className="relative h-[50vh] flex-1 md:h-auto">
+      <div className="relative h-[50vh] flex-1 md:h-full min-w-0">
         <JourneyGenie
           stops={day.stops}
           activeIndex={activeStop}
